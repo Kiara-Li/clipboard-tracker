@@ -75,7 +75,7 @@
         background-color: #555;
         transition: all 0.2s;
         padding: 0;
-        box-sizing: border-box; /* 确保边框计算在内 */
+        box-sizing: border-box; 
       }
       .type-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
       .type-btn.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
@@ -111,18 +111,18 @@
         font-weight: bold;
       }
       #close-btn:hover { color: #fff; }
+      
       /* --- 回家按钮 --- */
-      /* 源头按钮样式 */
       #visit-source-btn {
-        background: #2b4a3c; /* 像土壤一样的深绿色 */
+        background: #2b4a3c; 
         color: #98c9a3;
         border: 1px solid #3d6e52;
         padding: 4px 10px;
         border-radius: 4px;
         cursor: pointer;
         font-size: 12px;
-        margin-right: 8px; /* 和 Copy 按钮拉开点距离 */
-        display: none; /* 默认隐藏，因为旧数据可能没链接 */
+        margin-right: 8px; 
+        display: none; 
       }
       #visit-source-btn:hover {
         background: #3d6e52;
@@ -135,8 +135,59 @@
         font-size: 14px;
         line-height: 1.6;
         color: #eee;
-        white-space: pre-wrap; /* 保持换行 */
+        white-space: pre-wrap; 
         min-height: 50px;
+      }
+
+      /* --- (新增) 日期导航栏样式 --- */
+      #date-navigation {
+        position: absolute;
+        bottom: 60px; /* 在图例上方 */
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: rgba(0,0,0,0.4); /* 半透明背景 */
+        padding: 10px 30px;
+        border-radius: 30px;
+        backdrop-filter: blur(4px); /* 磨砂玻璃效果 */
+        z-index: 50;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+
+      #current-date-display {
+        color: #fff;
+        font-size: 16px;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        min-width: 120px; /* 固定最小宽度防止跳动 */
+        text-align: center;
+      }
+
+      .nav-btn {
+        background: none;
+        border: 1px solid #666;
+        color: #ddd;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        font-size: 14px;
+      }
+      .nav-btn:hover {
+        background: #444;
+        color: #fff;
+        border-color: #888;
+      }
+      /* 禁用状态样式 */
+      .nav-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
       }
 
       /* --- 底部图例 --- */
@@ -169,13 +220,18 @@
 
        <div class="action-buttons">
           <button id="visit-source-btn" title="Return to original soil">🌱 Source</button>
-          
           <button id="copy-text-btn">📋 Copy</button>
           <div id="close-btn">✕</div>
         </div>
       </div>
 
       <div id="detail-content">Loading...</div>
+    </div>
+
+    <div id="date-navigation">
+        <button id="prev-day-btn" class="nav-btn">◀</button>
+        <span id="current-date-display">Loading...</span>
+        <button id="next-day-btn" class="nav-btn">▶</button>
     </div>
 
     <div id="legend">

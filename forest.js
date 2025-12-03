@@ -2,25 +2,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("forestCanvas");
   const ctx = canvas.getContext("2d");
   
-  // DOM 元素获取
+  // --- DOM 元素 ---
   const overlay = document.getElementById("detail-overlay");
   const overlayContent = document.getElementById("detail-content");
-  const closeBtn = document.getElementById("close-btn"); // 这里的 ID 对应 html 里的关闭按钮
-  // 获取工具栏按钮
+  const closeBtn = document.getElementById("close-btn");
+  
   const btnCode = document.querySelector(".btn-code");
   const btnSocial = document.querySelector(".btn-social");
   const btnKnow = document.querySelector(".btn-know");
-    // 获取回家按钮
   const btnSource = document.getElementById("visit-source-btn");  
   const btnCopy = document.getElementById("copy-text-btn");
 
-  // 全局变量
-  let trees = []; // 存储所有树的数据对象
-  let hoveredTree = null; // 当前悬停的树
-  let currentOpenTreeIndex = -1; // 新增：记录当前打开的是哪棵树（原始索引）
-  const GROUND_Y_OFFSET = 0.8; // 地平线高度比例
+  // --- 新增：日期导航元素 ---
+  const dateDisplay = document.getElementById("current-date-display");
+  const btnPrevDay = document.getElementById("prev-day-btn");
+  const btnNextDay = document.getElementById("next-day-btn");
 
-  // 初始化画布尺寸
+  // --- 全局变量 ---
+  let trees = []; 
+  let hoveredTree = null; 
+  let currentOpenTreeTimeId = -1; // 修改：使用时间戳作为唯一ID，而不是索引
+  const GROUND_Y_OFFSET = 0.8; 
+
+  // --- 数据管理变量 (新增) ---
+  let groupedLogs = {}; // 存放分组后的数据: { "2023/10/27": [log1, log2], ... }
+  let availableDates = []; // 存放所有日期的数组
+  let currentViewIndex = 0; // 当前查看的是第几个日期
+
+  // --- 初始化 ---
   function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -31,13 +40,163 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 加载数据
   chrome.storage.local.get({ clipboardLog: [] }, (data) => {
-    generateForestData(data.clipboardLog);
-    drawScene();
+    processDataByDay(data.clipboardLog);
   });
 
-  // --- 1. 交互事件监听 (Canvas) ---
+  // --- 1. 核心逻辑：按天处理数据 ---
 
-  // 鼠标移动 (Hover 检测)
+  function processDataByDay(allLogs) {
+    if (!allLogs || allLogs.length === 0) {
+      if(dateDisplay) dateDisplay.textContent = "No Data";
+      return;
+    }
+
+    // 1. 分组: 按日期字符串作为 Key
+    groupedLogs = {};
+    allLogs.forEach(log => {
+      // 获取本地日期字符串 (例如 "2023/10/27")
+      const dateKey = new Date(log.time).toLocaleDateString(); 
+      if (!groupedLogs[dateKey]) {
+        groupedLogs[dateKey] = [];
+      }
+      groupedLogs[dateKey].push(log);
+    });
+
+    // 2. 获取所有日期并排序 (旧 -> 新)
+    availableDates = Object.keys(groupedLogs).sort((a, b) => {
+      return new Date(a) - new Date(b);
+    });
+
+    // 3. 默认显示最新的一天 (数组最后一个)
+    currentViewIndex = availableDates.length - 1;
+    
+    // 4. 渲染当前日期
+    renderCurrentDay();
+  }
+
+  function renderCurrentDay() {
+    if (availableDates.length === 0) return;
+
+    const dateKey = availableDates[currentViewIndex];
+    let logsForDay = groupedLogs[dateKey];
+
+    // --- 关键排序：最新的内容排在最前面 (最左边) ---
+    // 按时间戳倒序排列 (大 -> 小)
+    logsForDay = logsForDay.sort((a, b) => b.time - a.time);
+
+    // 更新 UI 文字
+    updateDateNavigationUI(dateKey);
+
+    // 生成森林数据
+    generateForestData(logsForDay);
+    
+    // 绘制
+    drawScene();
+  }
+
+  function updateDateNavigationUI(dateStr) {
+    if(dateDisplay) dateDisplay.textContent = dateStr;
+
+    // 控制按钮禁用状态
+    if(btnPrevDay) btnPrevDay.disabled = (currentViewIndex === 0);
+    if(btnNextDay) btnNextDay.disabled = (currentViewIndex === availableDates.length - 1);
+  }
+
+  // --- 2. 交互：日期切换 ---
+
+  if (btnPrevDay) {
+    btnPrevDay.addEventListener("click", () => {
+      if (currentViewIndex > 0) {
+        currentViewIndex--;
+        renderCurrentDay();
+      }
+    });
+  }
+
+  if (btnNextDay) {
+    btnNextDay.addEventListener("click", () => {
+      if (currentViewIndex < availableDates.length - 1) {
+        currentViewIndex++;
+        renderCurrentDay();
+      }
+    });
+  }
+
+  // --- 3. 森林生成与绘制 ---
+
+  function generateForestData(logs) {
+    trees = [];
+    const groundY = canvas.height * GROUND_Y_OFFSET;
+    let currentX = 50; // 起始位置 (左侧)
+    const spacing = 60; // 间距
+
+    logs.forEach((item) => {
+      let h = Math.min(Math.max(item.text.length / 2, 40), 300);
+      const type = item.manualType || getDomainType(item.domain);
+      const path = createTreePath(currentX, groundY, h, type);
+
+      trees.push({
+        path: path,
+        x: currentX,
+        y: groundY,
+        height: h,
+        type: type,
+        data: item,
+        // 关键：使用 time 作为唯一标识符，因为 index 现在是乱的
+        timeId: item.time 
+      });
+
+      currentX += spacing;
+    });
+  }
+
+  function drawScene() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 地平线
+    const groundY = canvas.height * GROUND_Y_OFFSET;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(canvas.width, groundY);
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 遍历画树
+    trees.forEach(tree => {
+      let color;
+      if (tree.type === "CODE") color = "#4dabf7";
+      else if (tree.type === "SOCIAL") color = "#ff6b6b";
+      else color = "#ffe066";
+
+      if (tree === hoveredTree) {
+        ctx.fillStyle = lightenColor(color, 40);
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = color;
+      } else {
+        ctx.fillStyle = color;
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.fill(tree.path);
+
+      // Hover 文字特效
+      if (tree === hoveredTree) {
+        ctx.save();
+        ctx.clip(tree.path);
+        ctx.fillStyle = "#000";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "center";
+        const snippet = tree.data.text.substring(0, 50);
+        wrapText(ctx, snippet, tree.x, tree.y - tree.height + 20, 40, 12);
+        ctx.restore();
+      }
+    });
+  }
+
+  // --- 4. 交互监听 (Canvas) ---
+
+  // 鼠标移动
   canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -58,86 +217,96 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 鼠标点击 (打开浮层)
+  // 点击
   canvas.addEventListener("click", () => {
     if (hoveredTree) {
-      // 记录当前操作的是哪棵树
-      currentOpenTreeIndex = hoveredTree.originalIndex;
+      currentOpenTreeTimeId = hoveredTree.timeId; // 记录时间戳 ID
       showOverlay(hoveredTree);
     }
   });
 
-  // --- 2. 交互事件监听 (工具栏/UI) ---
+  // --- 5. 浮层与按钮逻辑 ---
+  
+  if (closeBtn) closeBtn.addEventListener("click", hideOverlay);
 
-  // 关闭浮层
-  // 注意：如果您的 html 里关闭按钮是在 action-buttons 里，这里要确保 id 对应
-  if (closeBtn) {
-    closeBtn.addEventListener("click", hideOverlay);
+  function showOverlay(tree) {
+    overlayContent.textContent = tree.data.text;
+    overlay.style.display = "block";
+    updateTypeButtonsUI(tree.type);
+    if(btnCopy) btnCopy.textContent = "📋 Copy";
+
+    if (tree.data.url && btnSource) {
+        btnSource.style.display = "inline-block";
+        btnSource.onclick = () => window.open(tree.data.url, '_blank');
+    } else if (btnSource) {
+        btnSource.style.display = "none";
+    }
   }
 
-  // 复制功能
+  function hideOverlay() {
+    if(overlay) overlay.style.display = "none";
+  }
+
+  // 复制逻辑
   if (btnCopy) {
     btnCopy.onclick = () => {
       const text = overlayContent.textContent;
       navigator.clipboard.writeText(text).then(() => {
         const originalText = btnCopy.textContent;
         btnCopy.textContent = "✅ Copied!";
-        setTimeout(() => {
-          btnCopy.textContent = originalText;
-        }, 2000);
+        setTimeout(() => { btnCopy.textContent = originalText; }, 2000);
       });
     };
   }
 
-  // 类型切换功能
+  // 修改类型逻辑 (使用 Time ID 查找)
+  function changeTreeType(newType) {
+    // 1. 找到当前内存中的树
+    const targetTree = trees.find(t => t.timeId === currentOpenTreeTimeId);
+    
+    if (!targetTree || targetTree.type === newType) return;
+
+    // 更新内存
+    targetTree.type = newType;
+    targetTree.path = createTreePath(targetTree.x, targetTree.y, targetTree.height, newType);
+    updateTypeButtonsUI(newType);
+    drawScene();
+
+    // 2. 持久化回写到 Chrome Storage
+    chrome.storage.local.get({ clipboardLog: [] }, (data) => {
+      const logs = data.clipboardLog;
+      // 找到对应时间戳的记录
+      const logIndex = logs.findIndex(l => l.time === currentOpenTreeTimeId);
+      
+      if (logIndex !== -1) {
+        logs[logIndex].manualType = newType;
+        chrome.storage.local.set({ clipboardLog: logs });
+        
+        // 同时更新当前缓存 groupedLogs，避免翻页后丢失修改
+        // 找到当前显示的日期 key
+        const dateKey = availableDates[currentViewIndex];
+        const logInCache = groupedLogs[dateKey].find(l => l.time === currentOpenTreeTimeId);
+        if(logInCache) logInCache.manualType = newType;
+      }
+    });
+  }
+  
+  // 绑定类型按钮
   if (btnCode) btnCode.onclick = () => changeTreeType("CODE");
   if (btnSocial) btnSocial.onclick = () => changeTreeType("SOCIAL");
   if (btnKnow) btnKnow.onclick = () => changeTreeType("KNOWLEDGE");
 
-  // --- 3. 核心逻辑函数 ---
+  // --- 通用辅助函数 ---
 
-  function generateForestData(logs) {
-    trees = [];
-    const groundY = canvas.height * GROUND_Y_OFFSET;
-    let currentX = 50;
-    const spacing = 60;
-
-    logs.forEach((item, index) => {
-      let h = Math.min(Math.max(item.text.length / 2, 40), 300);
-      
-      // 优先使用手动设置的类型，如果没有则使用自动检测的
-      const type = item.manualType || getDomainType(item.domain);
-      
-      // 调用辅助函数创建路径
-      const path = createTreePath(currentX, groundY, h, type);
-
-      trees.push({
-        path: path,
-        x: currentX,
-        y: groundY,
-        height: h,
-        type: type,
-        data: item,
-        originalIndex: index // 保存原始索引以便后续查找修改
-      });
-
-      currentX += spacing;
-    });
-  }
-
-  // 辅助：根据参数创建路径 (提取出来方便修改类型时重用)
   function createTreePath(x, y, h, type) {
     const path = new Path2D();
     if (type === "CODE") {
-      // 长方形
       path.rect(x - 15, y - h, 30, h);
     } else if (type === "SOCIAL") {
-      // 圆形
       const r = h / 3;
-      path.rect(x - 2, y - h + r, 4, h - r); // 茎
-      path.arc(x, y - h + r, r, 0, Math.PI * 2); // 圆头
+      path.rect(x - 2, y - h + r, 4, h - r); 
+      path.arc(x, y - h + r, r, 0, Math.PI * 2); 
     } else {
-      // 三角形 (KNOWLEDGE)
       path.moveTo(x - 20, y);
       path.lineTo(x + 20, y);
       path.lineTo(x, y - h);
@@ -146,117 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return path;
   }
 
-  // 修改树的类型 (核心新功能)
-  function changeTreeType(newType) {
-    if (currentOpenTreeIndex === -1) return;
-
-    // 1. 在内存数组中找到这棵树
-    const targetTree = trees.find(t => t.originalIndex === currentOpenTreeIndex);
-    if (!targetTree) return;
-    if (targetTree.type === newType) return; // 类型一样就不动
-
-    // 2. 更新内存数据
-    targetTree.type = newType;
-    // 3. 重新计算形状路径 (否则点击检测还是原来的形状)
-    targetTree.path = createTreePath(targetTree.x, targetTree.y, targetTree.height, newType);
-
-    // 4. 更新 UI 按钮高亮
-    updateTypeButtonsUI(newType);
-
-    // 5. 重绘画布 (即时反馈)
-    drawScene();
-
-    // 6. 持久化保存到 Chrome Storage
-    chrome.storage.local.get({ clipboardLog: [] }, (data) => {
-      const logs = data.clipboardLog;
-      if (logs[currentOpenTreeIndex]) {
-        logs[currentOpenTreeIndex].manualType = newType; // 写入 manualType 字段
-        chrome.storage.local.set({ clipboardLog: logs });
-      }
-    });
-  }
-
-  function drawScene() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 画地平线
-    const groundY = canvas.height * GROUND_Y_OFFSET;
-    ctx.beginPath();
-    ctx.moveTo(0, groundY);
-    ctx.lineTo(canvas.width, groundY);
-    ctx.strokeStyle = "#555";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 遍历画树
-    trees.forEach(tree => {
-      let color;
-      if (tree.type === "CODE") color = "#4dabf7";
-      else if (tree.type === "SOCIAL") color = "#ff6b6b";
-      else color = "#ffe066";
-
-      // Hover 高亮处理
-      if (tree === hoveredTree) {
-        ctx.fillStyle = lightenColor(color, 40); // 真正变亮
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = color;
-      } else {
-        ctx.fillStyle = color;
-        ctx.shadowBlur = 0;
-      }
-
-      ctx.fill(tree.path);
-
-      // Hover 文字处理
-      if (tree === hoveredTree) {
-        ctx.save();
-        ctx.clip(tree.path);
-        ctx.fillStyle = "#000";
-        ctx.font = "10px sans-serif";
-        ctx.textAlign = "center";
-        const snippet = tree.data.text.substring(0, 50);
-        wrapText(ctx, snippet, tree.x, tree.y - tree.height + 20, 40, 12);
-        ctx.restore();
-      }
-    });
-  }
-
-  // --- 4. 辅助 UI 功能 ---
-
-function showOverlay(tree) {
-  document.getElementById("detail-content").textContent = tree.data.text;
-  document.getElementById("detail-overlay").style.display = "block";
-
-  updateTypeButtonsUI(tree.type);
-
-  // 重置 Copy 按钮
-  if(btnCopy) btnCopy.textContent = "📋 Copy";
-
-  // --- 新增：处理“回到土壤”逻辑 ---
-  if (tree.data.url) {
-    // 如果这棵树有来源链接
-    btnSource.style.display = "inline-block"; // 显示按钮
-    btnSource.onclick = () => {
-        window.open(tree.data.url, '_blank'); // 在新标签页打开
-    };
-  } else {
-    // 如果是旧数据（没有链接），隐藏按钮
-    btnSource.style.display = "none";
-  }
-}
-
-  function hideOverlay() {
-    overlay.style.display = "none";
-    currentOpenTreeIndex = -1; // 清空选中状态
-  }
-
   function updateTypeButtonsUI(type) {
-    // 移除所有 active
     if(btnCode) btnCode.classList.remove("active");
     if(btnSocial) btnSocial.classList.remove("active");
     if(btnKnow) btnKnow.classList.remove("active");
-
-    // 添加 active
     if (type === "CODE" && btnCode) btnCode.classList.add("active");
     if (type === "SOCIAL" && btnSocial) btnSocial.classList.add("active");
     if (type === "KNOWLEDGE" && btnKnow) btnKnow.classList.add("active");
@@ -269,13 +331,9 @@ function showOverlay(tree) {
     return "KNOWLEDGE";
   }
 
-  // 真正的颜色提亮算法 (Hex 颜色变亮)
   function lightenColor(hex, percent) {
-    // 移除 #
     hex = hex.replace(/^\s*#|\s*$/g, '');
-    if (hex.length === 3) {
-      hex = hex.replace(/(.)/g, '$1$1');
-    }
+    if (hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
     const num = parseInt(hex, 16);
     const amt = Math.round(2.55 * percent);
     const R = (num >> 16) + amt;
@@ -289,15 +347,13 @@ function showOverlay(tree) {
     ).toString(16).slice(1);
   }
 
-  // Canvas 文字换行
   function wrapText(context, text, x, y, maxWidth, lineHeight) {
     const words = text.split('');
     let line = '';
     for(let n = 0; n < words.length; n++) {
       const testLine = line + words[n];
       const metrics = context.measureText(testLine);
-      const testWidth = metrics.width;
-      if (testWidth > maxWidth && n > 0) {
+      if (metrics.width > maxWidth && n > 0) {
         context.fillText(line, x, y);
         line = words[n];
         y += lineHeight;
