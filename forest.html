@@ -111,6 +111,23 @@
         font-weight: bold;
       }
       #close-btn:hover { color: #fff; }
+      /* --- 回家按钮 --- */
+      /* 源头按钮样式 */
+      #visit-source-btn {
+        background: #2b4a3c; /* 像土壤一样的深绿色 */
+        color: #98c9a3;
+        border: 1px solid #3d6e52;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        margin-right: 8px; /* 和 Copy 按钮拉开点距离 */
+        display: none; /* 默认隐藏，因为旧数据可能没链接 */
+      }
+      #visit-source-btn:hover {
+        background: #3d6e52;
+        color: #fff;
+      }
 
       /* --- 文本内容区域 --- */
       #detail-content {
@@ -150,7 +167,9 @@
           <button class="type-btn btn-know" title="Knowledge (Triangle)"></button>
         </div>
 
-        <div class="action-buttons">
+       <div class="action-buttons">
+          <button id="visit-source-btn" title="Return to original soil">🌱 Source</button>
+          
           <button id="copy-text-btn">📋 Copy</button>
           <div id="close-btn">✕</div>
         </div>

@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCode = document.querySelector(".btn-code");
   const btnSocial = document.querySelector(".btn-social");
   const btnKnow = document.querySelector(".btn-know");
+    // 获取回家按钮
+  const btnSource = document.getElementById("visit-source-btn");  
   const btnCopy = document.getElementById("copy-text-btn");
 
   // 全局变量
@@ -221,16 +223,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- 4. 辅助 UI 功能 ---
 
-  function showOverlay(tree) {
-    overlayContent.textContent = tree.data.text;
-    overlay.style.display = "block";
-    
-    // 初始化按钮状态
-    updateTypeButtonsUI(tree.type);
-    
-    // 重置 Copy 按钮文本
-    if(btnCopy) btnCopy.textContent = "📋 Copy";
+function showOverlay(tree) {
+  document.getElementById("detail-content").textContent = tree.data.text;
+  document.getElementById("detail-overlay").style.display = "block";
+
+  updateTypeButtonsUI(tree.type);
+
+  // 重置 Copy 按钮
+  if(btnCopy) btnCopy.textContent = "📋 Copy";
+
+  // --- 新增：处理“回到土壤”逻辑 ---
+  if (tree.data.url) {
+    // 如果这棵树有来源链接
+    btnSource.style.display = "inline-block"; // 显示按钮
+    btnSource.onclick = () => {
+        window.open(tree.data.url, '_blank'); // 在新标签页打开
+    };
+  } else {
+    // 如果是旧数据（没有链接），隐藏按钮
+    btnSource.style.display = "none";
   }
+}
 
   function hideOverlay() {
     overlay.style.display = "none";

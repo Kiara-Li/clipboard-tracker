@@ -3,16 +3,18 @@ document.addEventListener("copy", () => {
   const copiedText = selection.toString().trim();
   if (!copiedText) return;
 
-  const timestamp = new Date().getTime(); // 使用时间戳更方便计算位置
-  const domain = window.location.hostname; // 获取域名，例如 "github.com" 或 "twitter.com"
-
+  const timestamp = new Date().getTime();
+  const domain = window.location.hostname; // 用于决定树的形状
+  const fullUrl = window.location.href;    // 新增：用于“回到土壤”
+  
   chrome.storage.local.get({ clipboardLog: [] }, (data) => {
     const updated = [...data.clipboardLog, { 
         text: copiedText, 
         time: timestamp, 
-        domain: domain 
+        domain: domain,
+        url: fullUrl // 新增保存字段
     }];
     chrome.storage.local.set({ clipboardLog: updated });
-    console.log(`Seed collected from ${domain}:`, copiedText.substring(0, 20) + "...");
+    console.log(`Seed collected from ${domain}`);
   });
 });
