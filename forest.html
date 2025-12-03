@@ -6,12 +6,9 @@
     <style>
       body {
         margin: 0;
-        background-color: #1a1a1a; /* 深色背景，突出几何图形 */
+        background-color: #1a1a1a;
         color: #ddd;
         font-family: sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         height: 100vh;
         overflow: hidden;
       }
@@ -20,31 +17,82 @@
         top: 20px;
         left: 20px;
         font-weight: 300;
-        opacity: 0.8;
+        z-index: 10;
+        pointer-events: none; /* 让鼠标穿透标题 */
       }
       canvas {
-        border-bottom: 2px solid #555; /* 地平线 */
+        display: block;
+        border-bottom: 2px solid #555;
         background: linear-gradient(to top, #1a1a1a 0%, #252525 100%);
       }
+      
+      /* --- 新增：详情浮层样式 --- */
+      #detail-overlay {
+        display: none; /* 默认隐藏 */
+        position: fixed;
+        top: 80px; /* 固定在上方 */
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        max-width: 600px;
+        max-height: 70vh;
+        background: rgba(30, 30, 30, 0.95);
+        border: 1px solid #555;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        padding: 20px;
+        z-index: 100;
+        overflow-y: auto;
+        backdrop-filter: blur(5px);
+      }
+      
+      #detail-content {
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #eee;
+        white-space: pre-wrap; /* 保持换行格式 */
+      }
+
+      #close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        cursor: pointer;
+        font-size: 20px;
+        color: #888;
+        font-weight: bold;
+        transition: color 0.2s;
+      }
+      #close-btn:hover { color: #fff; }
+
       #legend {
         position: absolute;
         bottom: 20px;
+        left: 20px;
         display: flex;
         gap: 20px;
         font-size: 12px;
         opacity: 0.7;
+        pointer-events: none;
       }
       .item span { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
     </style>
   </head>
   <body>
     <h1>The Transplanted Forest</h1>
-    <canvas id="forestCanvas"></canvas>
     
+    <canvas id="forestCanvas"></canvas>
+
+    <div id="detail-overlay">
+      <div id="close-btn">✕</div>
+      <div id="detail-content">Loading...</div>
+    </div>
+
     <div id="legend">
-      <div class="item"><span style="background:#4dabf7"></span>Code (Block)</div>
-      <div class="item"><span style="background:#ff6b6b"></span>Social (Circle)</div>
-      <div class="item"><span style="background:#ffe066"></span>Knowledge (Triangle)</div>
+      <div class="item"><span style="background:#4dabf7"></span>Code</div>
+      <div class="item"><span style="background:#ff6b6b"></span>Social</div>
+      <div class="item"><span style="background:#ffe066"></span>Knowledge</div>
     </div>
 
     <script src="forest.js"></script>
