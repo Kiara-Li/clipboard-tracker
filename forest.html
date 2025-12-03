@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>My Digital Forest</title>
+    <style>
+      body {
+        margin: 0;
+        background-color: #1a1a1a; /* 深色背景，突出几何图形 */
+        color: #ddd;
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+      }
+      h1 {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-weight: 300;
+        opacity: 0.8;
+      }
+      canvas {
+        border-bottom: 2px solid #555; /* 地平线 */
+        background: linear-gradient(to top, #1a1a1a 0%, #252525 100%);
+      }
+      #legend {
+        position: absolute;
+        bottom: 20px;
+        display: flex;
+        gap: 20px;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+      .item span { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
+    </style>
+  </head>
+  <body>
+    <h1>The Transplanted Forest</h1>
+    <canvas id="forestCanvas"></canvas>
+    
+    <div id="legend">
+      <div class="item"><span style="background:#4dabf7"></span>Code (Block)</div>
+      <div class="item"><span style="background:#ff6b6b"></span>Social (Circle)</div>
+      <div class="item"><span style="background:#ffe066"></span>Knowledge (Triangle)</div>
+    </div>
+
+    <script src="forest.js"></script>
+  </body>
+</html>

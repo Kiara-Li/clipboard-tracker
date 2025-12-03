@@ -1,12 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const list = document.getElementById("list");
-
-  chrome.storage.local.get({ clipboardLog: [] }, (data) => {
-    const logs = data.clipboardLog;
-    logs.slice().reverse().forEach((item) => {
-      const li = document.createElement("li");
-      li.textContent = item.text;
-      list.appendChild(li);
-    });
+  const btn = document.getElementById("openForestBtn");
+  
+  btn.addEventListener("click", () => {
+    // 打开扩展内部的 forest.html 页面
+    chrome.tabs.create({ url: 'forest.html' });
   });
 });

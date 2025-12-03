@@ -2,22 +2,33 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Clipboard Tracker</title>
+    <title>Clipboard Forest</title>
     <style>
       body {
-        font-family: sans-serif;
-        padding: 10px;
-        width: 300px;
+        font-family: 'Courier New', sans-serif;
+        padding: 20px;
+        width: 250px;
+        text-align: center;
+        background-color: #f0f0f0;
       }
-      li {
-        margin-bottom: 6px;
-        font-size: 14px;
+      h3 { color: #333; margin-top: 0; }
+      button {
+        background-color: #2e7d32; /* Forest Green */
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 5px;
+        margin-top: 10px;
       }
+      button:hover { background-color: #1b5e20; }
     </style>
   </head>
   <body>
-    <h3>Copied Texts</h3>
-    <ul id="list"></ul>
+    <h3>Clipboard Forest</h3>
+    <p>Your thoughts are growing.</p>
+    <button id="openForestBtn">View My Forest</button>
     <script src="popup.js"></script>
   </body>
 </html>
