@@ -1,8 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // --- DOM 元素 ---
+  const container = document.getElementById("canvas-container"); // 新增：滚动容器
   const canvas = document.getElementById("forestCanvas");
   const ctx = canvas.getContext("2d");
   
-  // --- DOM 元素 ---
   const overlay = document.getElementById("detail-overlay");
   const overlayContent = document.getElementById("detail-content");
   const closeBtn = document.getElementById("close-btn");
@@ -13,7 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnSource = document.getElementById("visit-source-btn");  
   const btnCopy = document.getElementById("copy-text-btn");
 
-  // --- 新增：日期导航元素 ---
   const dateDisplay = document.getElementById("current-date-display");
   const btnPrevDay = document.getElementById("prev-day-btn");
   const btnNextDay = document.getElementById("next-day-btn");
@@ -21,22 +21,26 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- 全局变量 ---
   let trees = []; 
   let hoveredTree = null; 
-  let currentOpenTreeTimeId = -1; // 修改：使用时间戳作为唯一ID，而不是索引
+  let currentOpenTreeTimeId = -1;
   const GROUND_Y_OFFSET = 0.8; 
+  
+  // 布局设置
+  const TREE_SPACING = 60; // 树间距
+  const START_X = 50;      // 左边距
 
-  // --- 数据管理变量 (新增) ---
-  let groupedLogs = {}; // 存放分组后的数据: { "2023/10/27": [log1, log2], ... }
-  let availableDates = []; // 存放所有日期的数组
-  let currentViewIndex = 0; // 当前查看的是第几个日期
+  // --- 数据管理变量 ---
+  let groupedLogs = {}; 
+  let availableDates = []; 
+  let currentViewIndex = 0; 
 
   // --- 初始化 ---
+  // 监听窗口大小变化：只调整高度，宽度由数据决定
   function resizeCanvas() {
-    canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    drawScene(); 
+    if(trees.length > 0) drawScene(); 
   }
   window.addEventListener("resize", resizeCanvas);
-  resizeCanvas();
+  canvas.height = window.innerHeight; // 初始高度设置
 
   // 加载数据
   chrome.storage.local.get({ clipboardLog: [] }, (data) => {
@@ -51,26 +55,25 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // 1. 分组: 按日期字符串作为 Key
     groupedLogs = {};
     allLogs.forEach(log => {
-      // 获取本地日期字符串 (例如 "2023/10/27")
-      const dateKey = new Date(log.time).toLocaleDateString(); 
+      let timeVal = new Date(log.time).getTime();
+      if (isNaN(timeVal)) timeVal = Date.now();
+
+      const dateObj = new Date(timeVal);
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`; 
+
       if (!groupedLogs[dateKey]) {
         groupedLogs[dateKey] = [];
       }
       groupedLogs[dateKey].push(log);
     });
 
-    // 2. 获取所有日期并排序 (旧 -> 新)
-    availableDates = Object.keys(groupedLogs).sort((a, b) => {
-      return new Date(a) - new Date(b);
-    });
-
-    // 3. 默认显示最新的一天 (数组最后一个)
+    availableDates = Object.keys(groupedLogs).sort();
     currentViewIndex = availableDates.length - 1;
-    
-    // 4. 渲染当前日期
     renderCurrentDay();
   }
 
@@ -80,24 +83,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const dateKey = availableDates[currentViewIndex];
     let logsForDay = groupedLogs[dateKey];
 
-    // --- 关键排序：最新的内容排在最前面 (最左边) ---
-    // 按时间戳倒序排列 (大 -> 小)
-    logsForDay = logsForDay.sort((a, b) => b.time - a.time);
+    // --- 排序：旧 -> 新 (a - b) ---
+    // 这样最新的树会在最右边
+    logsForDay = logsForDay.sort((a, b) => {
+        return new Date(a.time).getTime() - new Date(b.time).getTime();
+    });
 
-    // 更新 UI 文字
     updateDateNavigationUI(dateKey);
-
-    // 生成森林数据
     generateForestData(logsForDay);
     
-    // 绘制
+    // --- 关键修改：计算动态宽度 ---
+    // 宽度 = (树的数量 * 间距) + 起始位置 + 右边留白
+    const requiredWidth = (trees.length * TREE_SPACING) + START_X + 100;
+    // 确保宽度至少填满屏幕，如果树多则更宽
+    canvas.width = Math.max(window.innerWidth, requiredWidth);
+
     drawScene();
+
+    // --- 关键修改：自动滚动到最右边 ---
+    // 使用 setTimeout 确保渲染完后滚动
+    setTimeout(() => {
+        if(container) {
+            container.scrollTo({
+                left: canvas.width, // 滚到最右侧
+                behavior: 'smooth'  // 平滑滚动
+            });
+        }
+    }, 50);
   }
 
   function updateDateNavigationUI(dateStr) {
     if(dateDisplay) dateDisplay.textContent = dateStr;
-
-    // 控制按钮禁用状态
     if(btnPrevDay) btnPrevDay.disabled = (currentViewIndex === 0);
     if(btnNextDay) btnNextDay.disabled = (currentViewIndex === availableDates.length - 1);
   }
@@ -127,13 +143,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function generateForestData(logs) {
     trees = [];
     const groundY = canvas.height * GROUND_Y_OFFSET;
-    let currentX = 50; // 起始位置 (左侧)
-    const spacing = 60; // 间距
+    let currentX = START_X; 
 
     logs.forEach((item) => {
       let h = Math.min(Math.max(item.text.length / 2, 40), 300);
       const type = item.manualType || getDomainType(item.domain);
       const path = createTreePath(currentX, groundY, h, type);
+      const safeTimeId = item.time ? item.time : Date.now();
 
       trees.push({
         path: path,
@@ -142,18 +158,17 @@ document.addEventListener("DOMContentLoaded", () => {
         height: h,
         type: type,
         data: item,
-        // 关键：使用 time 作为唯一标识符，因为 index 现在是乱的
-        timeId: item.time 
+        timeId: safeTimeId 
       });
 
-      currentX += spacing;
+      currentX += TREE_SPACING;
     });
   }
 
   function drawScene() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 地平线
+    // 地平线 (横穿整个动态宽度)
     const groundY = canvas.height * GROUND_Y_OFFSET;
     ctx.beginPath();
     ctx.moveTo(0, groundY);
@@ -162,7 +177,6 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // 遍历画树
     trees.forEach(tree => {
       let color;
       if (tree.type === "CODE") color = "#4dabf7";
@@ -180,15 +194,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       ctx.fill(tree.path);
 
-      // Hover 文字特效
+      // 显示树龄 (Age)
       if (tree === hoveredTree) {
         ctx.save();
-        ctx.clip(tree.path);
-        ctx.fillStyle = "#000";
-        ctx.font = "10px sans-serif";
+        const ageText = getTreeAge(tree.data.time);
+        ctx.fillStyle = "#ffffff"; 
+        ctx.font = "bold 14px sans-serif";
         ctx.textAlign = "center";
-        const snippet = tree.data.text.substring(0, 50);
-        wrapText(ctx, snippet, tree.x, tree.y - tree.height + 20, 40, 12);
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(ageText, tree.x, tree.y - tree.height / 2);
         ctx.restore();
       }
     });
@@ -196,9 +212,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- 4. 交互监听 (Canvas) ---
 
-  // 鼠标移动
   canvas.addEventListener("mousemove", (e) => {
+    // 获取 Canvas 元素相对于视口的位置
     const rect = canvas.getBoundingClientRect();
+    // 计算鼠标在 Canvas 内部的坐标 (自动处理了滚动偏差)
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -217,10 +234,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 点击
   canvas.addEventListener("click", () => {
     if (hoveredTree) {
-      currentOpenTreeTimeId = hoveredTree.timeId; // 记录时间戳 ID
+      currentOpenTreeTimeId = hoveredTree.timeId;
       showOverlay(hoveredTree);
     }
   });
@@ -247,7 +263,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(overlay) overlay.style.display = "none";
   }
 
-  // 复制逻辑
   if (btnCopy) {
     btnCopy.onclick = () => {
       const text = overlayContent.textContent;
@@ -259,44 +274,52 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // 修改类型逻辑 (使用 Time ID 查找)
   function changeTreeType(newType) {
-    // 1. 找到当前内存中的树
     const targetTree = trees.find(t => t.timeId === currentOpenTreeTimeId);
-    
     if (!targetTree || targetTree.type === newType) return;
 
-    // 更新内存
     targetTree.type = newType;
     targetTree.path = createTreePath(targetTree.x, targetTree.y, targetTree.height, newType);
     updateTypeButtonsUI(newType);
     drawScene();
 
-    // 2. 持久化回写到 Chrome Storage
     chrome.storage.local.get({ clipboardLog: [] }, (data) => {
       const logs = data.clipboardLog;
-      // 找到对应时间戳的记录
       const logIndex = logs.findIndex(l => l.time === currentOpenTreeTimeId);
       
       if (logIndex !== -1) {
         logs[logIndex].manualType = newType;
         chrome.storage.local.set({ clipboardLog: logs });
         
-        // 同时更新当前缓存 groupedLogs，避免翻页后丢失修改
-        // 找到当前显示的日期 key
         const dateKey = availableDates[currentViewIndex];
-        const logInCache = groupedLogs[dateKey].find(l => l.time === currentOpenTreeTimeId);
-        if(logInCache) logInCache.manualType = newType;
+        if(groupedLogs[dateKey]) {
+            const logInCache = groupedLogs[dateKey].find(l => l.time === currentOpenTreeTimeId);
+            if(logInCache) logInCache.manualType = newType;
+        }
       }
     });
   }
   
-  // 绑定类型按钮
   if (btnCode) btnCode.onclick = () => changeTreeType("CODE");
   if (btnSocial) btnSocial.onclick = () => changeTreeType("SOCIAL");
   if (btnKnow) btnKnow.onclick = () => changeTreeType("KNOWLEDGE");
 
-  // --- 通用辅助函数 ---
+  // --- 辅助函数 ---
+
+  function getTreeAge(timestamp) {
+    if (!timestamp) return "";
+    const birthTime = new Date(timestamp).getTime();
+    if(isNaN(birthTime)) return "";
+    const now = Date.now();
+    const diffMs = now - birthTime;
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (minutes < 1) return "Just planted"; 
+    if (minutes < 60) return `${minutes} mins old`;
+    if (hours < 24) return `${hours} hrs old`;
+    return `${days} days old`;
+  }
 
   function createTreePath(x, y, h, type) {
     const path = new Path2D();
@@ -348,6 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function wrapText(context, text, x, y, maxWidth, lineHeight) {
+    // 树龄显示不需要 wrapText 了，但保留以防后续使用
     const words = text.split('');
     let line = '';
     for(let n = 0; n < words.length; n++) {

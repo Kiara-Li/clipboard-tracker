@@ -11,27 +11,57 @@
         color: #ddd;
         font-family: sans-serif;
         height: 100vh;
-        overflow: hidden;
+        overflow: hidden; /* 防止 body 出现滚动条，滚动条由 container 接管 */
       }
+
+      /* 标题固定 */
       h1 {
-        position: absolute;
+        position: fixed; /* 关键：固定定位 */
         top: 20px;
         left: 20px;
         font-weight: 300;
         z-index: 10;
         pointer-events: none;
         color: rgba(255, 255, 255, 0.5);
+        margin: 0;
       }
+
+      /* --- 关键：Canvas 滚动容器 --- */
+      #canvas-container {
+        width: 100%;
+        height: 100vh; /* 占满屏幕高度 */
+        overflow-x: auto; /* 允许横向滚动 */
+        overflow-y: hidden; /* 禁止纵向滚动 */
+        position: relative;
+        
+        /* 自定义滚动条样式 (Firefox) */
+        scrollbar-width: thin;
+        scrollbar-color: #555 #1a1a1a;
+      }
+
+      /* 自定义滚动条样式 (Chrome/Edge/Safari) */
+      #canvas-container::-webkit-scrollbar {
+        height: 8px;
+      }
+      #canvas-container::-webkit-scrollbar-track {
+        background: #1a1a1a;
+      }
+      #canvas-container::-webkit-scrollbar-thumb {
+        background-color: #555;
+        border-radius: 4px;
+      }
+
+      /* Canvas 样式 */
       canvas {
         display: block;
-        border-bottom: 2px solid #555;
         background: linear-gradient(to top, #1a1a1a 0%, #252525 100%);
+        /* border-bottom 不需要了，由 JS 绘制地平线 */
       }
 
       /* --- 详情浮层 (默认隐藏) --- */
       #detail-overlay {
-        display: none; /* 关键：默认必须隐藏！ */
-        position: fixed;
+        display: none; 
+        position: fixed; /* 关键：固定定位 */
         top: 80px;
         left: 50%;
         transform: translateX(-50%);
@@ -68,131 +98,50 @@
 
       /* --- 形状按钮 --- */
       .type-btn {
-        width: 24px;
-        height: 24px;
-        border: 2px solid transparent;
-        cursor: pointer;
-        background-color: #555;
-        transition: all 0.2s;
-        padding: 0;
-        box-sizing: border-box; 
+        width: 24px; height: 24px; border: 2px solid transparent; cursor: pointer;
+        background-color: #555; transition: all 0.2s; padding: 0; box-sizing: border-box; 
       }
       .type-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
       .type-btn.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
-
-      /* 1. 代码 - 正方形 */
       .btn-code { background-color: #4dabf7; border-radius: 2px; }
-      /* 2. 社交 - 圆形 */
       .btn-social { background-color: #ff6b6b; border-radius: 50%; }
-      /* 3. 知识 - 三角形 */
-      .btn-know {
-        background-color: #ffe066;
-        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-        width: 26px; height: 26px; 
-      }
+      .btn-know { background-color: #ffe066; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); width: 26px; height: 26px; }
 
       /* --- 功能按钮 --- */
-      #copy-text-btn {
-        background: #333;
-        color: #ddd;
-        border: 1px solid #666;
-        padding: 4px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-      }
+      #copy-text-btn { background: #333; color: #ddd; border: 1px solid #666; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
       #copy-text-btn:hover { background: #444; color: #fff; }
-
-      #close-btn {
-        font-size: 20px;
-        cursor: pointer;
-        color: #888;
-        margin-left: 10px;
-        font-weight: bold;
-      }
+      #close-btn { font-size: 20px; cursor: pointer; color: #888; margin-left: 10px; font-weight: bold; }
       #close-btn:hover { color: #fff; }
-      
-      /* --- 回家按钮 --- */
-      #visit-source-btn {
-        background: #2b4a3c; 
-        color: #98c9a3;
-        border: 1px solid #3d6e52;
-        padding: 4px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-        margin-right: 8px; 
-        display: none; 
-      }
-      #visit-source-btn:hover {
-        background: #3d6e52;
-        color: #fff;
-      }
+      #visit-source-btn { background: #2b4a3c; color: #98c9a3; border: 1px solid #3d6e52; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 8px; display: none; }
+      #visit-source-btn:hover { background: #3d6e52; color: #fff; }
 
       /* --- 文本内容区域 --- */
-      #detail-content {
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-        line-height: 1.6;
-        color: #eee;
-        white-space: pre-wrap; 
-        min-height: 50px;
-      }
+      #detail-content { font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.6; color: #eee; white-space: pre-wrap; min-height: 50px; }
 
-      /* --- (新增) 日期导航栏样式 --- */
+      /* --- 日期导航栏样式 --- */
       #date-navigation {
-        position: absolute;
-        bottom: 60px; /* 在图例上方 */
+        position: fixed; /* 关键：固定定位 */
+        bottom: 60px;
         left: 50%;
         transform: translateX(-50%);
         display: flex;
         align-items: center;
         gap: 20px;
-        background: rgba(0,0,0,0.4); /* 半透明背景 */
+        background: rgba(0,0,0,0.4);
         padding: 10px 30px;
         border-radius: 30px;
-        backdrop-filter: blur(4px); /* 磨砂玻璃效果 */
+        backdrop-filter: blur(4px);
         z-index: 50;
         border: 1px solid rgba(255,255,255,0.1);
       }
-
-      #current-date-display {
-        color: #fff;
-        font-size: 16px;
-        font-family: 'Courier New', monospace;
-        font-weight: bold;
-        min-width: 120px; /* 固定最小宽度防止跳动 */
-        text-align: center;
-      }
-
-      .nav-btn {
-        background: none;
-        border: 1px solid #666;
-        color: #ddd;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-        font-size: 14px;
-      }
-      .nav-btn:hover {
-        background: #444;
-        color: #fff;
-        border-color: #888;
-      }
-      /* 禁用状态样式 */
-      .nav-btn:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-      }
+      #current-date-display { color: #fff; font-size: 16px; font-family: 'Courier New', monospace; font-weight: bold; min-width: 120px; text-align: center; }
+      .nav-btn { background: none; border: 1px solid #666; color: #ddd; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 14px; }
+      .nav-btn:hover { background: #444; color: #fff; border-color: #888; }
+      .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
       /* --- 底部图例 --- */
       #legend {
-        position: absolute;
+        position: fixed; /* 关键：固定定位 */
         bottom: 20px;
         left: 20px;
         display: flex;
@@ -200,6 +149,7 @@
         font-size: 12px;
         opacity: 0.7;
         pointer-events: none;
+        z-index: 50;
       }
       .item span { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
     </style>
@@ -207,7 +157,9 @@
   <body>
     <h1>The Transplanted Forest</h1>
     
-    <canvas id="forestCanvas"></canvas>
+    <div id="canvas-container">
+        <canvas id="forestCanvas"></canvas>
+    </div>
 
     <div id="detail-overlay">
       <div class="overlay-toolbar">
@@ -224,7 +176,6 @@
           <div id="close-btn">✕</div>
         </div>
       </div>
-
       <div id="detail-content">Loading...</div>
     </div>
 
