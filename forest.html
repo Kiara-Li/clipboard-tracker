@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>My Digital Forest</title>
     <style>
+      /* --- 基础布局 --- */
       body {
         margin: 0;
         background-color: #1a1a1a;
@@ -18,19 +19,20 @@
         left: 20px;
         font-weight: 300;
         z-index: 10;
-        pointer-events: none; /* 让鼠标穿透标题 */
+        pointer-events: none;
+        color: rgba(255, 255, 255, 0.5);
       }
       canvas {
         display: block;
         border-bottom: 2px solid #555;
         background: linear-gradient(to top, #1a1a1a 0%, #252525 100%);
       }
-      
-      /* --- 新增：详情浮层样式 --- */
+
+      /* --- 详情浮层 (默认隐藏) --- */
       #detail-overlay {
-        display: none; /* 默认隐藏 */
+        display: none; /* 关键：默认必须隐藏！ */
         position: fixed;
-        top: 80px; /* 固定在上方 */
+        top: 80px;
         left: 50%;
         transform: translateX(-50%);
         width: 60%;
@@ -39,33 +41,88 @@
         background: rgba(30, 30, 30, 0.95);
         border: 1px solid #555;
         border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.8);
         padding: 20px;
         z-index: 100;
         overflow-y: auto;
         backdrop-filter: blur(5px);
       }
-      
+
+      /* --- 工具栏 --- */
+      .overlay-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #444;
+      }
+
+      .type-selector, .action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .label { font-size: 12px; color: #888; margin-right: 5px; }
+
+      /* --- 形状按钮 --- */
+      .type-btn {
+        width: 24px;
+        height: 24px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        background-color: #555;
+        transition: all 0.2s;
+        padding: 0;
+        box-sizing: border-box; /* 确保边框计算在内 */
+      }
+      .type-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
+      .type-btn.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+      /* 1. 代码 - 正方形 */
+      .btn-code { background-color: #4dabf7; border-radius: 2px; }
+      /* 2. 社交 - 圆形 */
+      .btn-social { background-color: #ff6b6b; border-radius: 50%; }
+      /* 3. 知识 - 三角形 */
+      .btn-know {
+        background-color: #ffe066;
+        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        width: 26px; height: 26px; 
+      }
+
+      /* --- 功能按钮 --- */
+      #copy-text-btn {
+        background: #333;
+        color: #ddd;
+        border: 1px solid #666;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      #copy-text-btn:hover { background: #444; color: #fff; }
+
+      #close-btn {
+        font-size: 20px;
+        cursor: pointer;
+        color: #888;
+        margin-left: 10px;
+        font-weight: bold;
+      }
+      #close-btn:hover { color: #fff; }
+
+      /* --- 文本内容区域 --- */
       #detail-content {
         font-family: 'Courier New', monospace;
         font-size: 14px;
         line-height: 1.6;
         color: #eee;
-        white-space: pre-wrap; /* 保持换行格式 */
+        white-space: pre-wrap; /* 保持换行 */
+        min-height: 50px;
       }
 
-      #close-btn {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        cursor: pointer;
-        font-size: 20px;
-        color: #888;
-        font-weight: bold;
-        transition: color 0.2s;
-      }
-      #close-btn:hover { color: #fff; }
-
+      /* --- 底部图例 --- */
       #legend {
         position: absolute;
         bottom: 20px;
@@ -85,7 +142,20 @@
     <canvas id="forestCanvas"></canvas>
 
     <div id="detail-overlay">
-      <div id="close-btn">✕</div>
+      <div class="overlay-toolbar">
+        <div class="type-selector">
+          <span class="label">Type:</span>
+          <button class="type-btn btn-code" title="Code (Block)"></button>
+          <button class="type-btn btn-social" title="Social (Circle)"></button>
+          <button class="type-btn btn-know" title="Knowledge (Triangle)"></button>
+        </div>
+
+        <div class="action-buttons">
+          <button id="copy-text-btn">📋 Copy</button>
+          <div id="close-btn">✕</div>
+        </div>
+      </div>
+
       <div id="detail-content">Loading...</div>
     </div>
 
