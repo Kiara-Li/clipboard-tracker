@@ -1,50 +1,92 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // --- DOM 元素 ---
-  const container = document.getElementById("canvas-container"); // 新增：滚动容器
+  // --- DOM 元素获取 ---
+  const container = document.getElementById("canvas-container");
   const canvas = document.getElementById("forestCanvas");
   const ctx = canvas.getContext("2d");
   
+  // 浮层元素
   const overlay = document.getElementById("detail-overlay");
   const overlayContent = document.getElementById("detail-content");
   const closeBtn = document.getElementById("close-btn");
   
+  // 工具栏按钮
   const btnCode = document.querySelector(".btn-code");
   const btnSocial = document.querySelector(".btn-social");
   const btnKnow = document.querySelector(".btn-know");
   const btnSource = document.getElementById("visit-source-btn");  
   const btnCopy = document.getElementById("copy-text-btn");
+  const btnDelete = document.getElementById("delete-tree-btn"); // 新增：删除按钮
 
+  // 顶部与导航元素
+  const btnExport = document.getElementById("export-btn"); // 新增：导出按钮
   const dateDisplay = document.getElementById("current-date-display");
   const btnPrevDay = document.getElementById("prev-day-btn");
   const btnNextDay = document.getElementById("next-day-btn");
+
+  // 帮助面板元素
+  const helpTrigger = document.getElementById("help-trigger");
+  const helpPanel = document.getElementById("help-panel");
+  const arrowIcon = document.getElementById("arrow-icon");
+  const closeHelpBtn = document.getElementById("close-help-btn");
 
   // --- 全局变量 ---
   let trees = []; 
   let hoveredTree = null; 
   let currentOpenTreeTimeId = -1;
   const GROUND_Y_OFFSET = 0.8; 
-  
-  // 布局设置
-  const TREE_SPACING = 60; // 树间距
-  const START_X = 50;      // 左边距
+  const TREE_SPACING = 60; 
+  const START_X = 50; 
 
   // --- 数据管理变量 ---
   let groupedLogs = {}; 
   let availableDates = []; 
   let currentViewIndex = 0; 
 
+  // --- 0. 帮助面板逻辑 (Onboarding) ---
+  
+  function toggleHelpPanel(forceState = null) {
+    const isOpen = forceState !== null ? forceState : !helpPanel.classList.contains("open");
+    
+    if (isOpen) {
+        helpPanel.classList.add("open");
+        if(arrowIcon) {
+            arrowIcon.textContent = "▲"; 
+            arrowIcon.style.color = "#4dabf7";
+        }
+    } else {
+        helpPanel.classList.remove("open");
+        if(arrowIcon) {
+            arrowIcon.textContent = "▼";
+            arrowIcon.style.color = "";
+        }
+    }
+  }
+
+  // 绑定帮助按钮事件
+  if(helpTrigger) helpTrigger.onclick = () => toggleHelpPanel();
+  if(closeHelpBtn) closeHelpBtn.onclick = () => toggleHelpPanel(false);
+
+  // 检查首次访问
+  function checkOnboarding() {
+    const hasSeenIntro = localStorage.getItem('forestIntroSeen');
+    if (!hasSeenIntro) {
+        toggleHelpPanel(true); // 首次访问自动展开
+        localStorage.setItem('forestIntroSeen', 'true');
+    }
+  }
+
   // --- 初始化 ---
-  // 监听窗口大小变化：只调整高度，宽度由数据决定
   function resizeCanvas() {
     canvas.height = window.innerHeight;
     if(trees.length > 0) drawScene(); 
   }
   window.addEventListener("resize", resizeCanvas);
-  canvas.height = window.innerHeight; // 初始高度设置
+  canvas.height = window.innerHeight;
 
   // 加载数据
   chrome.storage.local.get({ clipboardLog: [] }, (data) => {
     processDataByDay(data.clipboardLog);
+    checkOnboarding(); // 数据加载后检查引导
   });
 
   // --- 1. 核心逻辑：按天处理数据 ---
@@ -52,6 +94,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function processDataByDay(allLogs) {
     if (!allLogs || allLogs.length === 0) {
       if(dateDisplay) dateDisplay.textContent = "No Data";
+      // 清空画布
+      trees = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
 
@@ -73,18 +118,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     availableDates = Object.keys(groupedLogs).sort();
-    currentViewIndex = availableDates.length - 1;
+
+    // 索引修正：防止删除最后一条数据后索引越界
+    if (currentViewIndex >= availableDates.length) {
+        currentViewIndex = availableDates.length - 1;
+    }
+    // 如果是初始化（索引为0但我想看最新的），设为最后一天
+    // 这里我们简单逻辑：如果 currentViewIndex 还没被用户动过（假设逻辑），或者为了体验好，总是跳到最新
+    // 但为了支持“删除后停留在当前天”，我们只在初始化时跳到最新
+    if (trees.length === 0 && currentViewIndex === 0) {
+         currentViewIndex = availableDates.length - 1;
+    }
+
     renderCurrentDay();
   }
 
   function renderCurrentDay() {
-    if (availableDates.length === 0) return;
+    if (availableDates.length === 0) {
+        trees = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if(dateDisplay) dateDisplay.textContent = "Empty Forest";
+        return;
+    }
 
     const dateKey = availableDates[currentViewIndex];
     let logsForDay = groupedLogs[dateKey];
 
-    // --- 排序：旧 -> 新 (a - b) ---
-    // 这样最新的树会在最右边
+    // 排序：旧 -> 新 (a - b)
     logsForDay = logsForDay.sort((a, b) => {
         return new Date(a.time).getTime() - new Date(b.time).getTime();
     });
@@ -92,21 +152,19 @@ document.addEventListener("DOMContentLoaded", () => {
     updateDateNavigationUI(dateKey);
     generateForestData(logsForDay);
     
-    // --- 关键修改：计算动态宽度 ---
-    // 宽度 = (树的数量 * 间距) + 起始位置 + 右边留白
+    // 动态宽度
     const requiredWidth = (trees.length * TREE_SPACING) + START_X + 100;
-    // 确保宽度至少填满屏幕，如果树多则更宽
     canvas.width = Math.max(window.innerWidth, requiredWidth);
 
     drawScene();
 
-    // --- 关键修改：自动滚动到最右边 ---
-    // 使用 setTimeout 确保渲染完后滚动
+    // 自动滚动 (仅在初始化或切换日期时，为了简单，这里每次渲染都滚到最右，除非用户正在交互)
+    // 稍微延时等待渲染
     setTimeout(() => {
-        if(container) {
+        if(container && container.scrollLeft < canvas.width - window.innerWidth) {
             container.scrollTo({
-                left: canvas.width, // 滚到最右侧
-                behavior: 'smooth'  // 平滑滚动
+                left: canvas.width, 
+                behavior: 'smooth'
             });
         }
     }, 50);
@@ -168,7 +226,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function drawScene() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 地平线 (横穿整个动态宽度)
+    // [新增] 绘制背景渐变 (为了导出图片时有背景)
+    const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+    gradient.addColorStop(0, "#1a1a1a");
+    gradient.addColorStop(1, "#252525");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 地平线
     const groundY = canvas.height * GROUND_Y_OFFSET;
     ctx.beginPath();
     ctx.moveTo(0, groundY);
@@ -177,6 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
+    // 遍历画树
     trees.forEach(tree => {
       let color;
       if (tree.type === "CODE") color = "#4dabf7";
@@ -194,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       ctx.fill(tree.path);
 
-      // 显示树龄 (Age)
+      // 显示树龄
       if (tree === hoveredTree) {
         ctx.save();
         const ageText = getTreeAge(tree.data.time);
@@ -213,9 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- 4. 交互监听 (Canvas) ---
 
   canvas.addEventListener("mousemove", (e) => {
-    // 获取 Canvas 元素相对于视口的位置
     const rect = canvas.getBoundingClientRect();
-    // 计算鼠标在 Canvas 内部的坐标 (自动处理了滚动偏差)
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -241,7 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // --- 5. 浮层与按钮逻辑 ---
+  // --- 5. 功能逻辑 (浮层/删除/导出) ---
   
   if (closeBtn) closeBtn.addEventListener("click", hideOverlay);
 
@@ -263,6 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(overlay) overlay.style.display = "none";
   }
 
+  // 复制功能
   if (btnCopy) {
     btnCopy.onclick = () => {
       const text = overlayContent.textContent;
@@ -274,6 +339,39 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
+  // [新增] 删除功能
+  if (btnDelete) {
+    btnDelete.onclick = () => {
+        if (currentOpenTreeTimeId === -1) return;
+        
+        // 1. 获取数据
+        chrome.storage.local.get({ clipboardLog: [] }, (data) => {
+            let logs = data.clipboardLog;
+            // 2. 过滤掉当前树 (ID不匹配的保留)
+            const newLogs = logs.filter(l => l.time !== currentOpenTreeTimeId);
+            
+            // 3. 存回并刷新
+            chrome.storage.local.set({ clipboardLog: newLogs }, () => {
+                hideOverlay();
+                // 重新分组并渲染，实现无刷新删除
+                processDataByDay(newLogs);
+            });
+        });
+    };
+  }
+
+  // [新增] 导出图片功能
+  if (btnExport) {
+    btnExport.onclick = () => {
+        const link = document.createElement('a');
+        const dateStr = availableDates[currentViewIndex] || "MyForest";
+        link.download = `Forest-${dateStr}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+    };
+  }
+
+  // 修改类型逻辑
   function changeTreeType(newType) {
     const targetTree = trees.find(t => t.timeId === currentOpenTreeTimeId);
     if (!targetTree || targetTree.type === newType) return;
@@ -290,12 +388,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (logIndex !== -1) {
         logs[logIndex].manualType = newType;
         chrome.storage.local.set({ clipboardLog: logs });
-        
-        const dateKey = availableDates[currentViewIndex];
-        if(groupedLogs[dateKey]) {
-            const logInCache = groupedLogs[dateKey].find(l => l.time === currentOpenTreeTimeId);
-            if(logInCache) logInCache.manualType = newType;
-        }
+        // 简单处理：不更新 groupedLogs 缓存，因为一般不会频繁改了又翻页
       }
     });
   }
@@ -368,23 +461,5 @@ document.addEventListener("DOMContentLoaded", () => {
       (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
       (G < 255 ? (G < 1 ? 0 : G) : 255)
     ).toString(16).slice(1);
-  }
-
-  function wrapText(context, text, x, y, maxWidth, lineHeight) {
-    // 树龄显示不需要 wrapText 了，但保留以防后续使用
-    const words = text.split('');
-    let line = '';
-    for(let n = 0; n < words.length; n++) {
-      const testLine = line + words[n];
-      const metrics = context.measureText(testLine);
-      if (metrics.width > maxWidth && n > 0) {
-        context.fillText(line, x, y);
-        line = words[n];
-        y += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    context.fillText(line, x, y);
   }
 });
