@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let availableDates = []; 
   let currentViewIndex = 0; 
 
-  // --- 0. 帮助面板逻辑 (Onboarding) ---
+  // --- 0. 帮助面板逻辑 (新增的Onboarding) ---
   
   function toggleHelpPanel(forceState = null) {
     const isOpen = forceState !== null ? forceState : !helpPanel.classList.contains("open");
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
     checkOnboarding(); // 数据加载后检查引导
   });
 
-  // --- 1. 核心逻辑：按天处理数据 ---
+  // --- 更新的navi核心逻辑：让用户按天处理数据 ---
 
   function processDataByDay(allLogs) {
     if (!allLogs || allLogs.length === 0) {
@@ -124,8 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentViewIndex = availableDates.length - 1;
     }
     // 如果是初始化（索引为0但我想看最新的），设为最后一天
-    // 这里我们简单逻辑：如果 currentViewIndex 还没被用户动过（假设逻辑），或者为了体验好，总是跳到最新
-    // 但为了支持“删除后停留在当前天”，我们只在初始化时跳到最新
+    // 总是跳到最新，但为了支持“删除后停留在当前天”，让它只在初始化时跳到最新
     if (trees.length === 0 && currentViewIndex === 0) {
          currentViewIndex = availableDates.length - 1;
     }
@@ -133,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderCurrentDay();
   }
 
-  function renderCurrentDay() {
+  function renderCurrentDay() {//根据当前选中的日期，把那一天的“树”渲染到画布上
     if (availableDates.length === 0) {
         trees = [];
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -159,7 +158,6 @@ document.addEventListener("DOMContentLoaded", () => {
     drawScene();
 
     // 自动滚动 (仅在初始化或切换日期时，为了简单，这里每次渲染都滚到最右，除非用户正在交互)
-    // 稍微延时等待渲染
     setTimeout(() => {
         if(container && container.scrollLeft < canvas.width - window.innerWidth) {
             container.scrollTo({
@@ -399,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- 辅助函数 ---
 
-  function getTreeAge(timestamp) {
+  function getTreeAge(timestamp) {//把树的时间戳转换成“树龄”字符串
     if (!timestamp) return "";
     const birthTime = new Date(timestamp).getTime();
     if(isNaN(birthTime)) return "";
@@ -440,14 +438,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (type === "KNOWLEDGE" && btnKnow) btnKnow.classList.add("active");
   }
 
-  function getDomainType(domain) {
+  function getDomainType(domain) {//核心功能之一，用domain来自动分类树的类型，之后考虑添加更多规则
     if (!domain) return "KNOWLEDGE";
     if (domain.includes("github") || domain.includes("stack") || domain.includes("mdn")) return "CODE"; 
     if (domain.includes("twitter") || domain.includes("reddit") || domain.includes("bilibili")) return "SOCIAL";
     return "KNOWLEDGE";
   }
 
-  function lightenColor(hex, percent) {
+  function lightenColor(hex, percent) {//hover时用来变亮颜色的辅助函数
     hex = hex.replace(/^\s*#|\s*$/g, '');
     if (hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
     const num = parseInt(hex, 16);

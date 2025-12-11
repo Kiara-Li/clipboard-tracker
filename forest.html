@@ -14,7 +14,7 @@
         overflow: hidden;
       }
 
-      /* --- 关键：Canvas 滚动容器 --- */
+      /* --- 关键：Canvas 滚动容器,让画布可以无限延伸 --- */
       #canvas-container {
         width: 100%;
         height: 100vh;
@@ -34,12 +34,12 @@
         position: fixed;
         top: 20px;
         left: 20px;
-        z-index: 60; /* 保证在 Canvas 上方 */
+        z-index: 60; 
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         gap: 5px;
-        pointer-events: none; /* 让容器本身不挡鼠标，子元素开启 pointer-events */
+        pointer-events: none; 
       }
 
       h1 {
@@ -68,7 +68,7 @@
       }
       #help-trigger:hover { color: #4dabf7; }
       
-      /* --- 下拉帮助面板 (核心动画样式) --- */
+      /* --- 下拉帮助面板的动画样式 --- */
       #help-panel {
         background: rgba(20, 20, 20, 0.9);
         backdrop-filter: blur(8px);
@@ -78,7 +78,7 @@
         pointer-events: auto;
         
         /* 动画关键属性 */
-        max-height: 0; /* 默认关闭 */
+        max-height: 0; 
         overflow: hidden;
         opacity: 0;
         padding: 0 15px; /* 关闭时无 padding */
@@ -87,12 +87,12 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       }
 
-      /* 打开状态 (由 JS 添加这个 class) */
+      /* 打开状态 (待会由 JS 添加这个 class) */
       #help-panel.open {
         max-height: 500px; /* 足够大的高度 */
         opacity: 1;
         padding: 15px; /* 展开时才有 padding */
-        border-color: #4dabf7;
+        border-color: #ffffff;
       }
 
       /* 面板内文字样式 */
